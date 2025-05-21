@@ -1,0 +1,358 @@
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Investment Marketplace</title>
+<style>
+  /* Basic styling */
+  body {
+    margin: 0; padding: 0; font-family: Arial, sans-serif;
+    background: black; color: white;
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  header {
+    background: #111; padding: 1rem;
+    text-align: center; font-size: 1.5rem;
+  }
+  nav {
+    background: #222; display: flex; justify-content: center;
+  }
+  nav button {
+    flex: 1; padding: 1rem; font-size: 1rem; color: white;
+    background: #222; border: none; cursor: pointer;
+    transition: background 0.3s;
+  }
+  nav button:hover, nav button.active {
+    background: #555;
+  }
+  main {
+    flex: 1; padding: 1rem;
+  }
+  section {
+    display: none;
+  }
+  section.active {
+    display: block;
+  }
+  .business-card {
+    background: #222; padding: 1rem; margin: 1rem 0;
+    border-radius: 5px;
+  }
+  .business-card img {
+    max-width: 100%; border-radius: 5px;
+  }
+  label {
+    display: block; margin-top: 0.5rem;
+  }
+  input[type=text], input[type=email], input[type=password], textarea {
+    width: 100%; padding: 0.5rem; margin-top: 0.25rem;
+    border-radius: 3px; border: none;
+  }
+  button.primary {
+    margin-top: 1rem; padding: 0.75rem;
+    background: #0066cc; color: white; border: none; border-radius: 3px;
+    cursor: pointer;
+  }
+  .error {
+    color: #f44; margin-top: 0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<header>Investment Marketplace</header>
+
+<nav>
+  <button id="nav-home" class="active">Homepage</button>
+  <button id="nav-upload">Upload</button>
+  <button id="nav-profile">Profile</button>
+</nav>
+
+<main>
+
+  <!-- Login Section -->
+  <section id="login-section" class="active">
+    <h2>Login or Register</h2>
+    <form id="loginForm">
+      <label>Email:
+        <input type="email" id="loginEmail" required />
+      </label>
+      <label>Password:
+        <input type="password" id="loginPassword" required />
+      </label>
+      <button class="primary" type="submit">Login / Register</button>
+    </form>
+    <div id="loginError" class="error"></div>
+  </section>
+
+  <!-- Homepage Section -->
+  <section id="homepage-section">
+    <h2>Business Ideas</h2>
+    <div id="businessList"></div>
+  </section>
+
+  <!-- Upload Section -->
+  <section id="upload-section">
+    <h2>Upload Your Business Idea</h2>
+    <form id="uploadForm">
+      <label>Title:<input type="text" id="title" required /></label>
+      <label>Description:<textarea id="description" rows="4" required></textarea></label>
+      <label>Profit Data (days/months/years):<textarea id="profitData" rows="3" placeholder="e.g. Jan: $1000, Feb: $1200"></textarea></label>
+      <label>Business Phone:<input type="text" id="phone" /></label>
+      <label>Image URL:<input type="text" id="imageURL" placeholder="Paste an image URL here" /></label>
+      <button class="primary" type="submit">Upload</button>
+    </form>
+  </section>
+
+  <!-- Profile Section -->
+  <section id="profile-section">
+    <h2>Your Profile</h2>
+    <h3>Uploaded Businesses</h3>
+    <div id="uploadedBusinesses"></div>
+    <h3>Visited Businesses</h3>
+    <div id="visitedBusinesses"></div>
+    <button id="logoutBtn" class="primary">Logout</button>
+  </section>
+
+</main>
+
+<script>
+  // Basic data storage and user simulation
+  let users = JSON.parse(localStorage.getItem("users") || "[]");
+  let businesses = JSON.parse(localStorage.getItem("businesses") || "[]");
+  let currentUser = null;
+
+  // UI elements
+  const loginSection = document.getElementById("login-section");
+  const homepageSection = document.getElementById("homepage-section");
+  const uploadSection = document.getElementById("upload-section");
+  const profileSection = document.getElementById("profile-section");
+  const businessList = document.getElementById("businessList");
+  const uploadedBusinessesDiv = document.getElementById("uploadedBusinesses");
+  const visitedBusinessesDiv = document.getElementById("visitedBusinesses");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const loginError = document.getElementById("loginError");
+
+  // Navigation buttons
+  document.getElementById("nav-home").onclick = () => showSection("homepage");
+  document.getElementById("nav-upload").onclick = () => showSection("upload");
+  document.getElementById("nav-profile").onclick = () => showSection("profile");
+
+  function showSection(section) {
+    loginSection.classList.remove("active");
+    homepageSection.classList.remove("active");
+    uploadSection.classList.remove("active");
+    profileSection.classList.remove("active");
+
+    logoutBtn.style.display = "none";
+
+    if (!currentUser) {
+      loginSection.classList.add("active");
+      return;
+    }
+
+    if (section === "homepage") {
+      homepageSection.classList.add("active");
+      renderBusinessList();
+    } else if (section === "upload") {
+      uploadSection.classList.add("active");
+    } else if (section === "profile") {
+      profileSection.classList.add("active");
+      renderProfile();
+      logoutBtn.style.display = "inline-block";
+    }
+  }
+
+  // Login/Register form
+  document.getElementById("loginForm").onsubmit = e => {
+    e.preventDefault();
+    const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+    const password = document.getElementById("loginPassword").value;
+
+    if (!email || !password) {
+      loginError.textContent = "Please enter email and password";
+      return;
+    }
+
+    let user = users.find(u => u.email === email);
+
+    if (!user) {
+      // Register new user
+      user = {
+        email,
+        password,
+        uploaded: [],
+        visited: [],
+        blocked: false,
+      };
+      users.push(user);
+      saveUsers();
+    } else {
+      // Check password
+      if (user.password !== password) {
+        loginError.textContent = "Incorrect password";
+        return;
+      }
+    }
+
+    if(user.blocked){
+      loginError.textContent = "Your account is blocked.";
+      return;
+    }
+
+    currentUser = user;
+    loginError.textContent = "";
+    showSection("homepage");
+  };
+
+  logoutBtn.onclick = () => {
+    currentUser = null;
+    showSection("login");
+  };
+
+  // Save users and businesses to localStorage
+  function saveUsers() {
+    localStorage.setItem("users", JSON.stringify(users));
+  }
+  function saveBusinesses() {
+    localStorage.setItem("businesses", JSON.stringify(businesses));
+  }
+
+  // Render business list sorted by popularity (visitCount desc)
+  function renderBusinessList() {
+    businessList.innerHTML = "";
+
+    let sorted = [...businesses];
+    sorted.sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0));
+
+    if(sorted.length === 0){
+      businessList.innerHTML = "<p>No business ideas uploaded yet.</p>";
+      return;
+    }
+
+    sorted.forEach(biz => {
+      const card = createBusinessCard(biz);
+      businessList.appendChild(card);
+    });
+  }
+
+  // Create business card element
+  function createBusinessCard(biz) {
+    const card = document.createElement("div");
+    card.className = "business-card";
+
+    card.innerHTML = `
+      <h3>${biz.title}</h3>
+      ${biz.imageURL ? `<img src="${biz.imageURL}" alt="Business image" />` : ""}
+      <p>${biz.description}</p>
+      <div><strong>Profit Data:</strong> ${biz.profitData || "N/A"}</div>
+      <button>View Details & Invest</button>
+    `;
+
+    card.querySelector("button").onclick = () => {
+      recordVisit(biz.id);
+      alert(`Contact the businessman at phone: ${biz.phone}\n\n(Here chat feature can be implemented)`);
+    };
+
+    return card;
+  }
+
+  // Record visit for current user and increment business visit count
+  function recordVisit(bizId) {
+    if (!currentUser) return;
+
+    if (!currentUser.visited.includes(bizId)) {
+      currentUser.visited.push(bizId);
+      saveUsers();
+    }
+
+    let biz = businesses.find(b => b.id === bizId);
+    if (biz) {
+      biz.visitCount = (biz.visitCount || 0) + 1;
+      saveBusinesses();
+    }
+  }
+
+  // Upload form handler
+  document.getElementById("uploadForm").onsubmit = e => {
+    e.preventDefault();
+    if (!currentUser) return alert("Please login first to upload!");
+
+    const title = document.getElementById("title").value.trim();
+    const description = document.getElementById("description").value.trim();
+    const profitData = document.getElementById("profitData").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const imageURL = document.getElementById("imageURL").value.trim();
+
+    if (!title || !description) return alert("Title and description are required");
+
+    const newBiz = {
+      id: Date.now().toString(),
+      title,
+      description,
+      profitData,
+      phone,
+      imageURL,
+      visitCount: 0,
+      ownerEmail: currentUser.email,
+    };
+
+    businesses.push(newBiz);
+    currentUser.uploaded.push(newBiz.id);
+    saveBusinesses();
+    saveUsers();
+
+    alert("Business uploaded!");
+    e.target.reset();
+    showSection("homepage");
+    renderBusinessList();
+  };
+
+  // Render profile section
+  function renderProfile() {
+    uploadedBusinessesDiv.innerHTML = "";
+    if (currentUser.uploaded.length === 0) {
+      uploadedBusinessesDiv.innerHTML = "<p>You haven't uploaded any business ideas yet.</p>";
+    } else {
+      currentUser.uploaded.forEach(id => {
+        const biz = businesses.find(b => b.id === id);
+        if (biz) {
+          const card = createBusinessCard(biz);
+          uploadedBusinessesDiv.appendChild(card);
+        }
+      });
+    }
+
+    visitedBusinessesDiv.innerHTML = "";
+    if (currentUser.visited.length === 0) {
+      visitedBusinessesDiv.innerHTML = "<p>You haven't visited any business ideas yet.</p>";
+    } else {
+      currentUser.visited.forEach(id => {
+        const biz = businesses.find(b => b.id === id);
+        if (biz) {
+          const card = createBusinessCard(biz);
+          visitedBusinessesDiv.appendChild(card);
+        }
+      });
+    }
+  }
+
+  // Load last logged in user
+  window.onload = () => {
+    let lastEmail = localStorage.getItem("lastEmail");
+    if(lastEmail){
+      currentUser = users.find(u => u.email === lastEmail);
+      if(currentUser && !currentUser.blocked){
+        showSection("homepage");
+        logoutBtn.style.display = "inline-block";
+      }
+    }
+  };
+
+</script>
+
+</body>
+</html>
